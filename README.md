@@ -33,8 +33,8 @@ The Hospital Management System is a comprehensive desktop application designed t
 *(Once your application is stable and fully functional, replace this section with actual screenshots of your dashboard, patient management, appointment scheduling, etc. This significantly enhances your README.)*
 
 ![Dashboard Screenshot](./screenshot/hmsd.png)
-![Patients Screenshot](./sreenshot/patien.png)
-![Settings Screenshot](./sreenshot/hmsset.png)
+![Patients Screenshot](./screenshot/patien.png)
+![Settings Screenshot](./screenshot/hmsset.png)
 
 ## Technologies Used
 * **Python 3.x:** The core programming language.

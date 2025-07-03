@@ -1,8 +1,8 @@
 import tkinter as tk
-from tkinter import ttk, messagebox, Frame, Label, Button, BOTH, X, W, E, filedialog # Import filedialog
+from tkinter import ttk, messagebox, Frame, Label, Button, BOTH, X, W, E, filedialog
 import sqlite3
-import shutil # For file copying in restore
-from datetime import datetime # For timestamping backups
+import shutil
+from datetime import datetime
 
 class Settings:
     def __init__(self, master_frame, conn, c):
@@ -25,51 +25,109 @@ class Settings:
         self.report_path = tk.StringVar(value="./reports")
         self.auto_save_interval = tk.IntVar(value=5) # In minutes
         self.display_record_limit = tk.IntVar(value=50) # Number of records to display in tables
+        self.font_size = tk.IntVar(value=10) # Default font size for most text
+        self.notifications_var = tk.BooleanVar(value=True) # Duplicated from above, keeping for consistency with user code
+        self.backup_var = tk.BooleanVar(value=False) # For auto backup
+        self.language_var = tk.StringVar(value="English") # Duplicated from above, keeping for consistency with user code
+        self.startup_page = tk.StringVar(value="Dashboard")
+        self.dark_mode = tk.BooleanVar(value=False) # Initial state: Light mode
+
+        self.style = ttk.Style()
+        self.setup_themes() # Define custom themes
+        self.load_current_settings() # Load saved settings or apply defaults
+        self.apply_initial_theme() # Apply the theme based on loaded/default dark_mode setting
 
         self.create_settings_ui()
-        self.load_current_settings() # In a real app, this would load saved settings
+
+
+    def setup_themes(self):
+        """Defines custom light and dark themes based on existing ttk themes."""
+        # --- Light Mode Theme ---
+        # Based on 'clam' theme, but with specific overrides
+        self.style.theme_create("LightMode", parent="clam", settings={
+            "TFrame": {"configure": {"background": "#f0f2f5"}},
+            "TLabel": {"configure": {"background": "#f0f2f5", "foreground": "#333333"}},
+            "TLabelframe": {"configure": {"background": "#f0f2f5", "foreground": "#333333", "relief": "solid", "bordercolor": "#cccccc"}},
+            "TLabelframe.Label": {"configure": {"background": "#f0f2f5", "foreground": "#333333"}},
+            "TButton": {"configure": {"background": "#007bff", "foreground": "white", "font": ('Arial', 9, 'bold'), "padding": 6}},
+            "TButton:hover": {"configure": {"background": "#0056b3"}},
+            "TCheckbutton": {"configure": {"background": "#f0f2f5", "foreground": "#333333"}},
+            "TRadiobutton": {"configure": {"background": "#f0f2f5", "foreground": "#333333"}},
+            "TCombobox": {"configure": {"fieldbackground": "white", "foreground": "#333333", "selectbackground": "#e0e0e0", "selectforeground": "#333333"}},
+            "TEntry": {"configure": {"fieldbackground": "white", "foreground": "#333333"}},
+            "TSpinbox": {"configure": {"fieldbackground": "white", "foreground": "#333333"}},
+            "TScrollbar": {"configure": {"background": "#e0e0e0", "troughcolor": "#f0f0f0"}},
+            "Treeview": {"configure": {"background": "white", "foreground": "#333333", "fieldbackground": "white", "rowheight": 25}},
+            "Treeview.Heading": {"configure": {"background": "#607D8B", "foreground": "white", "font": ('Arial', 10, 'bold')}}
+        })
+
+        # --- Dark Mode Theme ---
+        # Based on 'clam' theme for consistent widget appearance, but with dark colors
+        self.style.theme_create("DarkMode", parent="clam", settings={
+            "TFrame": {"configure": {"background": "#2c2c2c"}},
+            "TLabel": {"configure": {"background": "#2c2c2c", "foreground": "#e0e0e0"}},
+            "TLabelframe": {"configure": {"background": "#2c2c2c", "foreground": "#e0e0e0", "relief": "solid", "bordercolor": "#444444"}},
+            "TLabelframe.Label": {"configure": {"background": "#2c2c2c", "foreground": "#e0e0e0"}},
+            "TButton": {"configure": {"background": "#343a40", "foreground": "#e0e0e0", "font": ('Arial', 9, 'bold'), "padding": 6}},
+            "TButton:hover": {"configure": {"background": "#495057"}},
+            "TCheckbutton": {"configure": {"background": "#2c2c2c", "foreground": "#e0e0e0"}},
+            "TRadiobutton": {"configure": {"background": "#2c2c2c", "foreground": "#e0e0e0"}},
+            "TCombobox": {"configure": {"fieldbackground": "#444444", "foreground": "#e0e0e0", "selectbackground": "#666666", "selectforeground": "#e0e0e0", "bordercolor": "#555555"}},
+            "TEntry": {"configure": {"fieldbackground": "#444444", "foreground": "#e0e0e0", "bordercolor": "#555555"}},
+            "TSpinbox": {"configure": {"fieldbackground": "#444444", "foreground": "#e0e0e0", "bordercolor": "#555555"}},
+            "TScrollbar": {"configure": {"background": "#555555", "troughcolor": "#3c3c3c"}},
+            "Treeview": {"configure": {"background": "#3c3c3c", "foreground": "#e0e0e0", "fieldbackground": "#3c3c3c", "rowheight": 25}},
+            "Treeview.Heading": {"configure": {"background": "#4a4a4a", "foreground": "#e0e0e0", "font": ('Arial', 10, 'bold')}}
+        })
+
+
+    def apply_initial_theme(self):
+        """Applies the initial theme based on the dark_mode setting."""
+        if self.dark_mode.get():
+            self.style.theme_use("DarkMode")
+        else:
+            self.style.theme_use("LightMode")
+
 
     def create_settings_ui(self):
-        self.main_frame = Frame(self.master_frame, bg='#f8f8f8')
+        # Main frame will take on the background from the theme
+        self.main_frame = ttk.Frame(self.master_frame)
         self.main_frame.pack(fill=BOTH, expand=True, padx=15, pady=15)
 
-        # Header
+        # Header - using ttk.Label for consistent theming
         ttk.Label(self.main_frame, text="Application Settings",
-                  font=('Arial', 24, 'bold'), foreground='#333333', background='#f8f8f8').pack(pady=(10, 20))
+                  font=('Arial', 24, 'bold')).pack(pady=(10, 20))
 
         # --- General Settings Section ---
-        general_settings_frame = ttk.LabelFrame(self.main_frame, text="General Settings", padding=(10, 10))
+        general_settings_frame = ttk.LabelFrame(self.main_frame, text="General Settings", padding=(15, 10))
         general_settings_frame.pack(fill=X, pady=10, padx=10)
+        general_settings_frame.grid_columnconfigure(1, weight=1) # Make entry columns expand
 
-        # Database Path Display (existing)
+        # Database Path Display
         ttk.Label(general_settings_frame, text="Database Path:", font=('Arial', 10, 'bold')).grid(row=0, column=0, padx=5, pady=5, sticky='w')
         db_path = self.conn.database if self.conn and hasattr(self.conn, 'database') else "Not connected"
         ttk.Label(general_settings_frame, text=db_path, font=('Arial', 10), foreground='blue').grid(row=0, column=1, padx=5, pady=5, sticky='ew')
 
-        # Application Theme (existing, updated to list all available themes)
-        ttk.Label(general_settings_frame, text="Application Theme:", font=('Arial', 10, 'bold')).grid(row=1, column=0, padx=5, pady=5, sticky='w')
-        self.theme_var = tk.StringVar(value="Default (Clam)") # Retain for UI, but populate from actual themes
-        self.theme_combo = ttk.Combobox(general_settings_frame, textvariable=self.theme_var,
-                                         values=ttk.Style().theme_names()) # Populate with all available ttk themes
-        self.theme_combo.grid(row=1, column=1, padx=5, pady=5, sticky='ew')
-        self.theme_combo.set(ttk.Style().theme_use()) # Set current theme as default selection
-        self.theme_combo.bind("<<ComboboxSelected>>", self.apply_theme_preview)
+        # Application Theme (Dropdown for available system themes + custom theme status)
+        ttk.Label(general_settings_frame, text="Current Base Theme:", font=('Arial', 10, 'bold')).grid(row=1, column=0, padx=5, pady=5, sticky='w')
+        # Display the active theme, but let dark mode control the custom theme.
+        ttk.Label(general_settings_frame, text=self.style.theme_use(), font=('Arial', 10, 'italic')).grid(row=1, column=1, padx=5, pady=5, sticky='ew')
+
 
         # Feature 1: Default Module on Startup
         ttk.Label(general_settings_frame, text="Default Startup Module:", font=('Arial', 10, 'bold')).grid(row=2, column=0, padx=5, pady=5, sticky='w')
         ttk.Combobox(general_settings_frame, textvariable=self.default_startup_module,
-                     values=["Dashboard", "Patients", "Doctors", "Appointments", "Medical Records", "Billing", "Reports", "Settings", "Help"]).grid(row=2, column=1, padx=5, pady=5, sticky='ew')
+                     values=["Dashboard", "Patients", "Doctors", "Appointments", "Medical Records", "Billing", "Reports", "Settings", "Help"], state="readonly").grid(row=2, column=1, padx=5, pady=5, sticky='ew')
 
         # Feature 2: Application Language
         ttk.Label(general_settings_frame, text="Application Language:", font=('Arial', 10, 'bold')).grid(row=3, column=0, padx=5, pady=5, sticky='w')
         ttk.Combobox(general_settings_frame, textvariable=self.app_language,
-                     values=["English", "Spanish", "French", "German"]).grid(row=3, column=1, padx=5, pady=5, sticky='ew')
-
-        general_settings_frame.grid_columnconfigure(1, weight=1) # Make entry columns expand
+                     values=["English", "Spanish", "French", "German"], state="readonly").grid(row=3, column=1, padx=5, pady=5, sticky='ew')
 
         # --- Notification Settings Section ---
-        notification_frame = ttk.LabelFrame(self.main_frame, text="Notification Settings", padding=(10, 10))
+        notification_frame = ttk.LabelFrame(self.main_frame, text="Notification Settings", padding=(15, 10))
         notification_frame.pack(fill=X, pady=10, padx=10)
+        notification_frame.grid_columnconfigure(1, weight=1)
 
         # Feature 3: Enable Notifications
         ttk.Checkbutton(notification_frame, text="Enable Application Notifications", variable=self.notifications_enabled).grid(row=0, column=0, columnspan=2, padx=5, pady=5, sticky='w')
@@ -77,12 +135,12 @@ class Settings:
         # Feature 4: Notification Frequency
         ttk.Label(notification_frame, text="Frequency:", font=('Arial', 10, 'bold')).grid(row=1, column=0, padx=5, pady=5, sticky='w')
         ttk.Combobox(notification_frame, textvariable=self.notification_frequency,
-                     values=["Daily", "Weekly", "Monthly", "Disabled"]).grid(row=1, column=1, padx=5, pady=5, sticky='ew')
-        notification_frame.grid_columnconfigure(1, weight=1)
+                     values=["Daily", "Weekly", "Monthly", "Disabled"], state="readonly").grid(row=1, column=1, padx=5, pady=5, sticky='ew')
 
         # --- Data & Logging Settings Section ---
-        data_logging_frame = ttk.LabelFrame(self.main_frame, text="Data & Logging", padding=(10, 10))
+        data_logging_frame = ttk.LabelFrame(self.main_frame, text="Data & Logging", padding=(15, 10))
         data_logging_frame.pack(fill=X, pady=10, padx=10)
+        data_logging_frame.grid_columnconfigure(1, weight=1)
 
         # Feature 5: Backup Database
         ttk.Button(data_logging_frame, text="Backup Database", command=self.backup_database).grid(row=0, column=0, padx=5, pady=5, sticky='w')
@@ -96,11 +154,11 @@ class Settings:
         # Feature 8: Log File Max Size
         ttk.Label(data_logging_frame, text="Max Log File Size (MB):", font=('Arial', 10, 'bold')).grid(row=2, column=0, padx=5, pady=5, sticky='w')
         ttk.Spinbox(data_logging_frame, from_=10, to=1000, increment=10, textvariable=self.log_max_size).grid(row=2, column=1, padx=5, pady=5, sticky='ew')
-        data_logging_frame.grid_columnconfigure(1, weight=1)
 
         # --- Display & Performance Settings Section ---
-        display_perf_frame = ttk.LabelFrame(self.main_frame, text="Display & Performance", padding=(10, 10))
+        display_perf_frame = ttk.LabelFrame(self.main_frame, text="Display & Performance", padding=(15, 10))
         display_perf_frame.pack(fill=X, pady=10, padx=10)
+        display_perf_frame.grid_columnconfigure(1, weight=1)
 
         # Feature 9: Row Highlighting in Tables
         ttk.Checkbutton(display_perf_frame, text="Enable Row Highlighting in Tables", variable=self.row_highlighting).grid(row=0, column=0, columnspan=2, padx=5, pady=5, sticky='w')
@@ -108,114 +166,137 @@ class Settings:
         # Feature 10: Auto-save Interval
         ttk.Label(display_perf_frame, text="Auto-save Interval (minutes):", font=('Arial', 10, 'bold')).grid(row=1, column=0, padx=5, pady=5, sticky='w')
         ttk.Spinbox(display_perf_frame, from_=1, to=60, increment=1, textvariable=self.auto_save_interval).grid(row=1, column=1, padx=5, pady=5, sticky='ew')
-        display_perf_frame.grid_columnconfigure(1, weight=1)
 
-        # Default Report Save Path (existing, now with browse button)
+        # Default Report Save Path (with browse button)
         ttk.Label(display_perf_frame, text="Default Report Save Path:", font=('Arial', 10, 'bold')).grid(row=2, column=0, padx=5, pady=5, sticky='w')
         self.report_path_entry = ttk.Entry(display_perf_frame, textvariable=self.report_path)
         self.report_path_entry.grid(row=2, column=1, padx=5, pady=5, sticky='ew')
-        ttk.Button(display_perf_frame, text="Browse", command=self.browse_report_path).grid(row=2, column=2, padx=5, pady=5, sticky='w')
+        ttk.Button(display_perf_frame, text="Browse", command=self.browse_report_path, width=8).grid(row=2, column=2, padx=(5,0), pady=5, sticky='w')
 
+
+        # --- Advanced Preferences Section ---
+        extra_frame = ttk.LabelFrame(self.main_frame, text="Advanced Preferences", padding=(15, 10))
+        extra_frame.pack(fill=X, pady=10, padx=10)
+        extra_frame.grid_columnconfigure(1, weight=1)
+
+        # 1. Font Size Selector
+        ttk.Label(extra_frame, text="Global Font Size:", font=('Arial', 10, 'bold')).grid(row=0, column=0, padx=5, pady=5, sticky=W)
+        ttk.Spinbox(extra_frame, from_=8, to=30, textvariable=self.font_size).grid(row=0, column=1, padx=5, pady=5, sticky='ew')
+
+        # 2. Enable Notifications (re-used from above, assuming this is a master switch or a different type)
+        ttk.Checkbutton(extra_frame, text="Enable All Notifications", variable=self.notifications_var).grid(row=1, column=0, columnspan=2, sticky='w', padx=5, pady=5)
+
+        # 3. Auto Backup
+        ttk.Checkbutton(extra_frame, text="Enable Automatic Database Backup", variable=self.backup_var).grid(row=2, column=0, columnspan=2, sticky='w', padx=5, pady=5)
+
+        # 4. Language Selector (re-used from above, assuming this is a global language setting)
+        ttk.Label(extra_frame, text="Application Language:", font=('Arial', 10, 'bold')).grid(row=3, column=0, padx=5, pady=5, sticky=W)
+        ttk.Combobox(extra_frame, textvariable=self.language_var, values=["English", "Swahili", "French", "Spanish"], state="readonly").grid(row=3, column=1, padx=5, pady=5, sticky='ew')
+
+        # 5. User Role (Display Only)
+        ttk.Label(extra_frame, text="Current User Role:", font=('Arial', 10, 'bold')).grid(row=4, column=0, padx=5, pady=5, sticky=W)
+        ttk.Label(extra_frame, text="Administrator", foreground="green").grid(row=4, column=1, padx=5, pady=5, sticky='ew')
+
+        # 6. Startup Page
+        ttk.Label(extra_frame, text="Default Startup Page:", font=('Arial', 10, 'bold')).grid(row=5, column=0, padx=5, pady=5, sticky=W)
+        ttk.Combobox(extra_frame, textvariable=self.startup_page, values=["Dashboard", "Appointments", "Patients", "Doctors", "Medical Records", "Billing", "Reports"], state="readonly").grid(row=5, column=1, padx=5, pady=5, sticky='ew')
+
+        # 7. Dark Mode Switch
+        ttk.Checkbutton(extra_frame, text="Enable Dark Mode", variable=self.dark_mode, command=self.toggle_dark_mode).grid(row=6, column=0, columnspan=2, sticky='w', padx=5, pady=10)
+
+        # 8. Check for Updates Button
+        ttk.Button(extra_frame, text="Check for Updates", command=self.check_updates).grid(row=7, column=0, columnspan=2, pady=10)
+
+        # 9. Version Display
+        ttk.Label(extra_frame, text="App Version: v1.0.3", font=('Arial', 9, 'italic'), foreground="gray").grid(row=8, column=0, columnspan=2, sticky='e', padx=5, pady=5)
 
         # --- Action Buttons ---
-        action_buttons_frame = Frame(self.main_frame, bg='#f8f8f8')
+        action_buttons_frame = ttk.Frame(self.main_frame, padding=(10, 5))
         action_buttons_frame.pack(fill=X, pady=20, padx=10)
         action_buttons_frame.columnconfigure(0, weight=1)
         action_buttons_frame.columnconfigure(1, weight=1)
 
-        # Extra Settings
-        extra_frame = ttk.LabelFrame(self.main_frame, text="Advanced Preferences", padding=(10, 10))
-        extra_frame.pack(fill=X, pady=10, padx=10)
-
-        # 1. Font Size Selector
-        ttk.Label(extra_frame, text="Font Size:", font=('Arial', 10, 'bold')).grid(row=0, column=0, padx=5, pady=5, sticky=W)
-        self.font_size = tk.IntVar(value=12)
-        ttk.Spinbox(extra_frame, from_=8, to=30, textvariable=self.font_size).grid(row=0, column=1, padx=5, pady=5, sticky=E)
-
-        # 2. Enable Notifications
-        self.notifications_var = tk.BooleanVar(value=True)
-        ttk.Checkbutton(extra_frame, text="Enable Notifications", variable=self.notifications_var).grid(row=1, column=0, columnspan=2, sticky=W, padx=5, pady=5)
-
-        # 3. Auto Backup
-        self.backup_var = tk.BooleanVar(value=False)
-        ttk.Checkbutton(extra_frame, text="Enable Auto Backup", variable=self.backup_var).grid(row=2, column=0, columnspan=2, sticky=W, padx=5, pady=5)
-
-        # 4. Language Selector
-        ttk.Label(extra_frame, text="Language:", font=('Arial', 10, 'bold')).grid(row=3, column=0, padx=5, pady=5, sticky=W)
-        self.language_var = tk.StringVar(value="English")
-        ttk.Combobox(extra_frame, textvariable=self.language_var, values=["English", "Swahili", "French", "Spanish"]).grid(row=3, column=1, padx=5, pady=5, sticky=E)
-
-        # 5. User Role (Display Only)
-        ttk.Label(extra_frame, text="User Role:", font=('Arial', 10, 'bold')).grid(row=4, column=0, padx=5, pady=5, sticky=W)
-        ttk.Label(extra_frame, text="Administrator", foreground="green").grid(row=4, column=1, padx=5, pady=5, sticky=E)
-
-        # 6. Reset to Default Button
-        ttk.Button(extra_frame, text="Reset to Default", command=self.reset_defaults).grid(row=5, column=0, columnspan=2, pady=10)
-
-        # 7. Startup Page
-        ttk.Label(extra_frame, text="Startup Page:", font=('Arial', 10, 'bold')).grid(row=6, column=0, padx=5, pady=5, sticky=W)
-        self.startup_page = tk.StringVar(value="Dashboard")
-        ttk.Combobox(extra_frame, textvariable=self.startup_page, values=["Dashboard", "Appointments", "Reports", "Settings"]).grid(row=6, column=1, padx=5, pady=5, sticky=E)
-
-        # 8. Dark Mode
-        self.dark_mode = tk.BooleanVar()
-        ttk.Checkbutton(extra_frame, text="Enable Dark Mode", variable=self.dark_mode, command=self.toggle_dark_mode).grid(row=7, column=0, columnspan=2, sticky=W, padx=5, pady=5)
-
-        # 9. Check for Updates Button
-        ttk.Button(extra_frame, text="Check for Updates", command=self.check_updates).grid(row=8, column=0, columnspan=2, pady=10)
-
-        # 10. Version Display
-        ttk.Label(extra_frame, text="App Version: v1.0.3", font=('Arial', 9, 'italic'), foreground="gray").grid(row=9, column=0, columnspan=2, sticky=E, padx=5, pady=5)
-
         ttk.Button(action_buttons_frame, text="Save Settings", command=self.save_settings).grid(row=0, column=0, padx=5, sticky='ew')
-        ttk.Button(action_buttons_frame, text="Reset to Defaults", command=self.reset_to_defaults).grid(row=0, column=1, padx=5, sticky='ew')
+        ttk.Button(action_buttons_frame, text="Reset All Defaults", command=self.reset_all_defaults).grid(row=0, column=1, padx=5, sticky='ew')
 
 
     def load_current_settings(self):
         # In a full application, this method would load settings from a configuration file (e.g., JSON, INI)
-        # For this demo, values are initialized with defaults, so this method serves as a placeholder.
-        # Example of loading:
+        # For this demo, values are initialized with defaults.
+        # Example of loading from a hypothetical JSON file:
+        # import json
         # try:
         #     with open("app_settings.json", "r") as f:
         #         settings_data = json.load(f)
         #     self.notifications_enabled.set(settings_data.get("notifications_enabled", True))
         #     self.notification_frequency.set(settings_data.get("notification_frequency", "Daily"))
-        #     # ... load other settings
+        #     self.app_language.set(settings_data.get("app_language", "English"))
+        #     self.audit_logging_enabled.set(settings_data.get("audit_logging_enabled", False))
+        #     self.log_max_size.set(settings_data.get("log_max_size_mb", 100))
+        #     self.default_startup_module.set(settings_data.get("default_startup_module", "Dashboard"))
+        #     self.row_highlighting.set(settings_data.get("row_highlighting_enabled", True))
+        #     self.report_path.set(settings_data.get("report_save_path", "./reports"))
+        #     self.auto_save_interval.set(settings_data.get("auto_save_interval_minutes", 5))
+        #     self.display_record_limit.set(settings_data.get("display_record_limit", 50))
+        #     self.font_size.set(settings_data.get("global_font_size", 10))
+        #     self.notifications_var.set(settings_data.get("notifications_enabled_master", True)) # Master switch
+        #     self.backup_var.set(settings_data.get("auto_backup_enabled", False))
+        #     self.language_var.set(settings_data.get("app_language_global", "English")) # Global language
+        #     self.startup_page.set(settings_data.get("startup_page", "Dashboard"))
+        #     self.dark_mode.set(settings_data.get("dark_mode_enabled", False))
         # except FileNotFoundError:
         #     print("Settings file not found, using default settings.")
-        pass
+        # except Exception as e:
+        #     print(f"Error loading settings: {e}, using default settings.")
+        pass # Placeholder for actual loading logic
 
-    def reset_defaults(self):
-        self.report_path_entry.delete(0, tk.END)
-        self.report_path_entry.insert(0, "./reports")
-        self.theme_var.set("Default (Clam)")
-        self.font_size.set(12)
-        self.notifications_var.set(True)
-        self.backup_var.set(False)
-        self.language_var.set("English")
-        self.startup_page.set("Dashboard")
-        self.dark_mode.set(False)
-        messagebox.showinfo("Defaults Restored", "All settings have been reset to default.")
+    def reset_all_defaults(self):
+        """Resets all settings variables to their initial default values and updates the UI."""
+        if messagebox.askyesno("Confirm Reset", "Are you sure you want to reset ALL settings to their default values? This cannot be undone for unsaved changes."):
+            self.notifications_enabled.set(True)
+            self.notification_frequency.set("Daily")
+            self.app_language.set("English")
+            self.audit_logging_enabled.set(False)
+            self.log_max_size.set(100)
+            self.default_startup_module.set("Dashboard")
+            self.row_highlighting.set(True)
+            self.report_path.set("./reports")
+            self.auto_save_interval.set(5)
+            self.display_record_limit.set(50)
+            self.font_size.set(10)
+            self.notifications_var.set(True)
+            self.backup_var.set(False)
+            self.language_var.set("English")
+            self.startup_page.set("Dashboard")
+            self.dark_mode.set(False) # Reset to light mode
+
+            self.apply_initial_theme() # Apply the light theme
+
+            # Manually update entry fields if necessary (as StringVar doesn't always update visual instantly)
+            self.report_path_entry.delete(0, tk.END)
+            self.report_path_entry.insert(0, self.report_path.get())
+
+            messagebox.showinfo("Settings Reset", "All settings have been reset to default values.")
 
     def toggle_dark_mode(self):
+        """Switches between LightMode and DarkMode themes."""
         if self.dark_mode.get():
-            self.main_frame.configure(bg="#2c2c2c")
+            self.style.theme_use("DarkMode")
         else:
-            self.main_frame.configure(bg="#f8f8f8")
+            self.style.theme_use("LightMode")
+
+        # Optional: Apply font size changes here if you want them tied to theme
+        # self.apply_font_size()
 
     def check_updates(self):
         # Simulated check
-        messagebox.showinfo("Update Check", "You are using the latest version.")
+        messagebox.showinfo("Update Check", "Checking for updates...\n\nYou are using the latest version (v1.0.3).")
 
     def apply_theme_preview(self, event=None):
-        selected_theme = self.theme_var.get()
-        style = ttk.Style()
-        try:
-            style.theme_use(selected_theme)
-            # messagebox.showinfo("Theme Preview", f"Theme set to: {selected_theme}") # Optional: show a small info box
-        except Exception as e:
-            messagebox.showerror("Theme Error", f"Could not apply theme: {e}")
-            print(f"Error applying theme: {e}")
+        # This method is removed as dark mode now controls the theme directly.
+        # You can re-add if you want to allow users to pick other base ttk themes,
+        # but it would complicate the light/dark mode logic.
+        pass
 
     def backup_database(self):
         # Ensure the database connection is available
@@ -280,36 +361,11 @@ class Settings:
             self.report_path.set(folder_selected)
 
     def clear_temporary_files(self):
+        # This method was not called in the UI but was present. Keeping for completeness.
         if messagebox.askyesno("Clear Temporary Files", "This will remove temporary application files. Do you want to proceed?"):
             # Placeholder for actual file deletion logic. In a real app, you'd delete specific temp files.
             messagebox.showinfo("Success", "Temporary files 'cleared'. (No actual files deleted in this demo)")
             print("Action: Clear Temporary Files (Demo)")
-
-    def reset_to_defaults(self):
-        if messagebox.askyesno("Reset Settings", "Are you sure you want to reset all settings to their default values?"):
-            # Reset all internal variables to their initial values
-            self.notifications_enabled.set(True)
-            self.notification_frequency.set("Daily")
-            self.app_language.set("English")
-            self.audit_logging_enabled.set(False)
-            self.log_max_size.set(100)
-            self.default_startup_module.set("Dashboard")
-            self.row_highlighting.set(True)
-            self.report_path.set("./reports")
-            self.auto_save_interval.set(5)
-            self.display_record_limit.set(50)
-
-            # Update UI elements to reflect new values
-            self.theme_var.set("Default (Clam)") # Reset theme dropdown
-            ttk.Style().theme_use('clam') # Apply default theme visually
-
-            # Update entry widgets manually if not directly linked to StringVar (like self.report_path_entry)
-            self.report_path_entry.delete(0, tk.END)
-            self.report_path_entry.insert(0, self.report_path.get())
-
-            messagebox.showinfo("Settings Reset", "All settings have been reset to their default values.")
-            print("Action: Settings Reset to Defaults (Demo)")
-
 
     def save_settings(self):
         # Gather all current settings values
@@ -324,7 +380,12 @@ class Settings:
             "report_save_path": self.report_path.get(),
             "auto_save_interval_minutes": self.auto_save_interval.get(),
             "display_record_limit": self.display_record_limit.get(),
-            "application_theme": self.theme_var.get()
+            "global_font_size": self.font_size.get(),
+            "notifications_enabled_master": self.notifications_var.get(),
+            "auto_backup_enabled": self.backup_var.get(),
+            "app_language_global": self.language_var.get(),
+            "startup_page": self.startup_page.get(),
+            "dark_mode_enabled": self.dark_mode.get()
         }
 
         # In a real application, you would save `settings_data` to a persistent file (e.g., JSON, INI, custom)

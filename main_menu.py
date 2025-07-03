@@ -1,4 +1,3 @@
-# main_menu.py
 import tkinter as tk
 from tkinter import *
 from tkinter import ttk, messagebox
@@ -13,7 +12,7 @@ from doctor_management import DoctorManagement
 from appointment import AppointmentManagement
 from medical_records import MedicalRecords
 from reports import Reports
-from settings import Settings
+from settings import Settings # Ensure this import is correct
 from help import Help
 from update_appointments import UpdateAppointments
 from display_appointments import DisplayAppointments
@@ -23,6 +22,9 @@ class HospitalManagementSystem:
     def __init__(self, master):
         self.master = master
         self.master.title("Hospital Management System")
+
+        # Global font size variable (used for zoom functionality)
+        self.current_font_size = 10 # Default font size
 
         # Window setup
         self.setup_window()
@@ -71,7 +73,7 @@ class HospitalManagementSystem:
         self.style = ttk.Style()
 
         # General Button style
-        self.style.configure('TButton', font=('Arial', 10), padding=6)
+        self.style.configure('TButton', font=('Arial', self.current_font_size), padding=6)
         self.style.map('TButton',
                        foreground=[('pressed', 'white'), ('active', 'white')],
                        background=[('pressed', '!active', '#2980b9'), ('active', '#3498db')])
@@ -83,7 +85,7 @@ class HospitalManagementSystem:
 
         # Sidebar Button styles
         self.style.configure('Sidebar.TButton',
-                           font=('Arial', 12, 'bold'),
+                           font=('Arial', self.current_font_size + 2, 'bold'), # Slightly larger font for sidebar
                            foreground='white',
                            background='#2c3e50',
                            borderwidth=0,
@@ -94,7 +96,7 @@ class HospitalManagementSystem:
 
         # Label styles
         self.style.configure('Header.TLabel',
-                           font=('Arial', 20, 'bold'),
+                           font=('Arial', self.current_font_size + 10, 'bold'), # Larger font for header
                            foreground='white',
                            background='#2c3e50')
 
@@ -103,6 +105,14 @@ class HospitalManagementSystem:
         self.style.map('Danger.TButton',
                        background=[('active', '#cc0000')],
                        foreground=[('active', 'white')])
+
+        # You might also want to configure styles for other widgets that will be affected by zoom
+        self.style.configure('TLabel', font=('Arial', self.current_font_size))
+        self.style.configure('TEntry', font=('Arial', self.current_font_size))
+        self.style.configure('TCombobox', font=('Arial', self.current_font_size))
+        self.style.configure('TCheckbutton', font=('Arial', self.current_font_size))
+        self.style.configure('TSpinbox', font=('Arial', self.current_font_size))
+        self.style.configure('TLabelframe.Label', font=('Arial', self.current_font_size + 2, 'bold')) # LabelFrame title
 
     def connect_db_and_create_tables(self):
         """Connects to the database and creates tables if they don't exist."""
@@ -237,7 +247,6 @@ class HospitalManagementSystem:
         # --- View Menu ---
         view_menu = Menu(menubar, tearoff=0)
         menubar.add_cascade(label="View", menu=view_menu)
-        # FIX: Changed ttk.BooleanVar to tk.BooleanVar
         self.show_toolbar_var = tk.BooleanVar(value=True) # Store the variable if you want to control toolbar visibility
         view_menu.add_checkbutton(label="Show Toolbar", variable=self.show_toolbar_var, command=self.toggle_toolbar_visibility)
         view_menu.add_checkbutton(label="Show Status Bar", variable=tk.BooleanVar(value=True)) # Assuming a status bar will be added
@@ -248,9 +257,11 @@ class HospitalManagementSystem:
         # --- Tools Menu ---
         tools_menu = Menu(menubar, tearoff=0)
         menubar.add_cascade(label="Tools", menu=tools_menu)
-        tools_menu.add_command(label="Options", command=self.show_settings)
+        tools_menu.add_command(label="Options", command=self.show_settings) # Linking to show_settings
         tools_menu.add_command(label="Spell Check", command=self.spell_check)
-        tools_menu.add_command(label="Preferences", command=self.show_preferences)
+        tools_menu.add_command(label="Preferences", command=self.show_preferences) # Linking to show_settings again
+        tools_menu.add_separator()
+        tools_menu.add_command(label="Check for Updates", command=lambda: messagebox.showinfo("Updates", "Checking for updates... (Simulated)"))
 
         # --- Window Menu ---
         window_menu = Menu(menubar, tearoff=0)
@@ -276,7 +287,6 @@ class HospitalManagementSystem:
         else:
             self.toolbar_frame.pack_forget()
 
-# ... (rest of your HospitalManagementSystem class and main execution block)
     def create_toolbar_buttons(self):
         """Create top toolbar with quick access buttons."""
         toolbar_items = [
@@ -290,15 +300,14 @@ class HospitalManagementSystem:
         ]
 
         for text, command in toolbar_items:
-            btn = Button(self.toolbar_frame, text=text, command=command,
-                        bg='#34495e', fg='white', font=('Arial', 10),
-                        bd=0, padx=12, pady=5, relief=FLAT,
-                        activebackground='#2980b9', activeforeground='white')
-            btn.pack(side=LEFT, padx=2)
+            # Using ttk.Button for toolbar buttons to be consistent with theming
+            btn = ttk.Button(self.toolbar_frame, text=text, command=command, style='TButton')
+            btn.pack(side=LEFT, padx=2, pady=5) # Added pady for consistent spacing
 
         # Add clock
-        self.clock_label = Label(self.toolbar_frame, text="",
-                               bg='#34495e', fg='white', font=('Arial', 10))
+        self.clock_label = ttk.Label(self.toolbar_frame, text="",
+                               style='Toolbar.TLabel') # Use a themed label for clock
+        self.style.configure('Toolbar.TLabel', background='#34495e', foreground='white', font=('Arial', self.current_font_size))
         self.clock_label.pack(side=RIGHT, padx=10)
         self.update_clock()
 
@@ -360,6 +369,7 @@ class HospitalManagementSystem:
         try:
             module = __import__(module_name)
             module_class = getattr(module, class_name)
+            # Pass the database connection and cursor to the module
             module_class(self.content_frame, self.conn, self.c)
 
         except ImportError:
@@ -389,34 +399,78 @@ class HospitalManagementSystem:
 
     def show_about(self):
         """Displays an about message box."""
-        messagebox.showinfo("About", "Hospital Management System\nVersion 1.0\nDeveloped by Your Name/Team")
+        messagebox.showinfo("About Hospital Management System", "Hospital Management System\nVersion 1.0.3\nDeveloped for efficient hospital operations.")
 
     def on_closing(self):
         """Handles closing the application and database connection cleanly."""
-        if messagebox.askokcancel("Quit", "Do you want to quit the application?"):
+        if messagebox.askokcancel("Quit Application", "Do you want to quit the application?"):
             if self.conn:
                 self.conn.close()
                 print("Database connection closed.")
             self.master.destroy()
 
-    def new_file(self): pass
-    def open_file(self): pass
-    def save_file(self): pass
-    def save_as(self): pass
-    def print_file(self): pass
-    def undo(self): pass
-    def redo(self): pass
-    def cut(self): pass
-    def copy(self): pass
-    def paste(self): pass
-    def delete(self): pass
-    def select_all(self): pass
-    def zoom_in(self): pass
-    def zoom_out(self): pass
-    def reset_zoom(self): pass
-    def spell_check(self): pass
-    def show_preferences(self): pass
-    def send_feedback(self): pass
+    # --- Implemented Placeholder Functions ---
+    def new_file(self):
+        messagebox.showinfo("New File", "This function would typically create a new, blank document or clear the current workspace, but for this database-driven system, its direct utility may vary per module.")
+
+    def open_file(self):
+        messagebox.showinfo("Open File", "This function would typically open an existing file. For this system, it might be used to import data or open saved reports.")
+
+    def save_file(self):
+        messagebox.showinfo("Save File", "This function typically saves the current document. For this system, data is usually saved automatically to the database, or this could trigger saving a report.")
+
+    def save_as(self):
+        messagebox.showinfo("Save As", "This function allows saving the current data or report to a new location or name. (e.g., Export Report As...)")
+
+    def print_file(self):
+        messagebox.showinfo("Print", "This function would initiate printing of the current view or a selected report.")
+
+    def undo(self):
+        messagebox.showinfo("Undo", "Undo action triggered. (Requires specific implementation for text fields or data entry forms).")
+
+    def redo(self):
+        messagebox.showinfo("Redo", "Redo action triggered. (Requires specific implementation for text fields or data entry forms).")
+
+    def cut(self):
+        messagebox.showinfo("Cut", "Cut action triggered. (Requires a selected text or element in an active widget).")
+
+    def copy(self):
+        messagebox.showinfo("Copy", "Copy action triggered. (Requires a selected text or element in an active widget).")
+
+    def paste(self):
+        messagebox.showinfo("Paste", "Paste action triggered. (Requires an active text input field).")
+
+    def delete(self):
+        messagebox.showinfo("Delete", "Delete action triggered. (Requires a selected element or text).")
+
+    def select_all(self):
+        messagebox.showinfo("Select All", "Select All action triggered. (Requires an active text input field or selectable list).")
+
+    def zoom_in(self):
+        self.current_font_size = min(self.current_font_size + 1, 20) # Max font size 20
+        self.configure_styles() # Re-apply styles with new font size
+        messagebox.showinfo("Zoom", f"Zoom In: Font size set to {self.current_font_size}")
+
+    def zoom_out(self):
+        self.current_font_size = max(self.current_font_size - 1, 8) # Min font size 8
+        self.configure_styles() # Re-apply styles with new font size
+        messagebox.showinfo("Zoom", f"Zoom Out: Font size set to {self.current_font_size}")
+
+    def reset_zoom(self):
+        self.current_font_size = 10 # Reset to default
+        self.configure_styles() # Re-apply styles with default font size
+        messagebox.showinfo("Zoom", "Zoom Reset: Font size restored to default (10).")
+
+    def spell_check(self):
+        messagebox.showinfo("Spell Check", "Spell check functionality not yet implemented.")
+
+    def show_preferences(self):
+        # Directing Preferences to the Settings module as they are often synonymous
+        self.show_settings()
+        messagebox.showinfo("Preferences", "Opening Application Settings/Preferences.")
+
+    def send_feedback(self):
+        messagebox.showinfo("Send Feedback", "This function would open a feedback form or email client to send feedback.")
 
 if __name__ == "__main__":
     root = Tk()
